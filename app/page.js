@@ -143,24 +143,30 @@ export default function Home() {
   const [dark, setDark] = useState(true);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(true);
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
+      setShowInstallBanner(true);
     };
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
 
   const handleInstallApp = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setMessage('App installed successfully!');
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setMessage('App installed successfully!');
+        setShowInstallBanner(false);
+      }
+      setDeferredPrompt(null);
+    } else {
+      alert("📲 Mobile Mein App Install Karne Ke Liye:\n\n1. Browser Ke Top/Bottom 3 Dots Par Click Karein.\n2. 'Add to Home Screen' Ya 'Install App' Par Tap Karein!");
     }
-    setDeferredPrompt(null);
   };
 
   const totalSize = useMemo(() => files.reduce((sum, file) => sum + file.size, 0), [files]);
@@ -278,11 +284,9 @@ export default function Home() {
           <a href="#contact">Contact</a>
         </nav>
         <div className="top-actions">
-          {deferredPrompt && (
-            <button className="primary-btn small-btn" onClick={handleInstallApp}>
-              📲 Install App
-            </button>
-          )}
+          <button className="primary-btn small-btn" onClick={handleInstallApp}>
+            📲 Install App
+          </button>
           <button className="theme-toggle" onClick={() => setDark((value) => !value)} aria-label="Toggle theme">
             <span>◐</span>
           </button>
@@ -295,36 +299,38 @@ export default function Home() {
           <div className="eyebrow"><span>✦</span> FAST <b>•</b> SECURE <b>•</b> FREE</div>
           <h1>Universal File Converter<br /><span>Convert Anything, Effortlessly.</span></h1>
           <p>Transform documents, images, audio, video and spreadsheets in a beautiful, simple workspace. Your files stay in your browser while you work (Developed by Arslan fayyaz).</p>
+          
           <div className="hero-benefits">
             <div>
               <span>▣</span>
-              <div>
-                <b>100+ Formats</b>
-                <small>Wide format support</small>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <b style={{ display: 'block', marginBottom: '4px' }}>100+ Formats</b>
+                <small style={{ display: 'block', opacity: 0.8 }}>Wide format support</small>
               </div>
             </div>
             <div>
               <span>ϟ</span>
-              <div>
-                <b>Fast Conversions</b>
-                <small>In seconds</small>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <b style={{ display: 'block', marginBottom: '4px' }}>Fast Conversions</b>
+                <small style={{ display: 'block', opacity: 0.8 }}>In seconds</small>
               </div>
             </div>
             <div>
               <span>♢</span>
-              <div>
-                <b>Secure & Private</b>
-                <small>Browser-first processing</small>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <b style={{ display: 'block', marginBottom: '4px' }}>Secure & Private</b>
+                <small style={{ display: 'block', opacity: 0.8 }}>Browser-first processing</small>
               </div>
             </div>
             <div>
               <span>☁</span>
-              <div>
-                <b>No Installation</b>
-                <small>Works on any device</small>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <b style={{ display: 'block', marginBottom: '4px' }}>No Installation</b>
+                <small style={{ display: 'block', opacity: 0.8 }}>Works on any device</small>
               </div>
             </div>
           </div>
+
         </div>
         <div className="hero-art" aria-hidden="true">
           <div className="orbit orbit-one" /><div className="orbit orbit-two" />
@@ -447,6 +453,66 @@ export default function Home() {
         </div>
         <p>FileForge is designed as a privacy-first conversion workspace with a modern interface, clear feedback and responsive controls.</p>
       </section>
+
+      {/* FLOATING MOBILE APP INSTALL BANNER */}
+      {showInstallBanner && (
+        <div style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          left: '20px',
+          maxWidth: '400px',
+          margin: '0 auto',
+          backgroundColor: '#16181e',
+          border: '1px solid #0070f3',
+          padding: '16px',
+          borderRadius: '16px',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '24px' }}>📲</span>
+            <div>
+              <b style={{ display: 'block', fontSize: '14px', color: '#fff' }}>Converter ko Mobile pe Download krein</b>
+              <small style={{ fontSize: '12px', color: '#a1a1aa' }}>Fast access & offline usage</small>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              onClick={handleInstallApp}
+              style={{
+                backgroundColor: '#0070f3',
+                color: '#fff',
+                border: 'none',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
+              Install
+            </button>
+            <button
+              onClick={() => setShowInstallBanner(false)}
+              style={{
+                backgroundColor: 'transparent',
+                color: '#71717a',
+                border: 'none',
+                fontSize: '16px',
+                cursor: 'pointer',
+                padding: '4px'
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       <footer id="contact" className="footer container">
         <a className="brand" href="#home">
