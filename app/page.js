@@ -148,7 +148,7 @@ export default function Home() {
       <div className="ambient ambient-two" />
 
       <header className="topbar container">
-        <a className="brand" href="#home" aria-label="FileForge home">
+        <a className="brand" href="#home" aria-label="File home">
           <span className="brand-mark">⬡</span>
           <span>File<span>Forge</span></span>
         </a>
@@ -244,7 +244,7 @@ export default function Home() {
 
       <section id="about" className="about-strip container"><div><span className="section-kicker">BUILT FOR EVERYONE</span><h2>Powerful tools. Simple experience.</h2></div><p>FileForge is designed as a privacy-first conversion workspace with a modern interface, clear feedback and responsive controls.</p></section>
 
-      <footer id="contact" className="footer container"><a className="brand" href="#home"><span className="brand-mark">⬡</span><span>File<span>Forge</span></span></a><p>© 2026 FileForge. All rights reserved.</p><div><a href="#about">Privacy</a><a href="#about">Terms</a><a href="#contact">Contact</a></div></footer>
+      <footer id="contact" className="footer container"><a className="brand" href="#home"><span className="brand-mark">⬡</span><span>File<span>Forge</span></span></a><p>© 2026 FileForge.All rights reserved. Developed by Arslan fayyaz </p><div><a href="#about">Privacy</a><a href="#about">Terms</a><a href="#contact">Contact</a></div></footer>
     </main>
   );
 }
