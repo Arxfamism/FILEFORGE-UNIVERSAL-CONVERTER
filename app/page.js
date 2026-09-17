@@ -15,9 +15,10 @@ const tabs = [
   { id: 'document-pdf', label: 'Document to PDF', icon: '▥' },
   { id: 'csv-xlsx', label: 'CSV to XLSX', icon: '▦' },
   { id: 'ocr-text', label: 'OCR (Image to Text)', icon: '🔍' },
+  { id: 'media-audio', label: 'Video to MP3 / Audio', icon: '🎵' },
 ];
 
-const formats = ['PDF', 'PNG', 'JPG', 'WEBP', 'CSV', 'XLSX', 'TXT'];
+const formats = ['PDF', 'PNG', 'JPG', 'WEBP', 'CSV', 'XLSX', 'TXT', 'MP3', 'WAV'];
 
 function downloadBlob(blob, name) {
   const url = URL.createObjectURL(blob);
@@ -34,6 +35,10 @@ function readableSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function baseName(name) {
+  return name.replace(/\.[^/.]+$/, '');
+}
+
 async function convertImage(file, mime, quality) {
   const bitmap = await createImageBitmap(file);
   const canvas = document.createElement('canvas');
@@ -44,6 +49,50 @@ async function convertImage(file, mime, quality) {
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Image conversion failed'))), mime, quality / 100);
   });
+}
+
+async function extractAudioFromMedia(file, targetFormat = 'mp3') {
+  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  const arrayBuffer = await file.arrayBuffer();
+  const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+  const numberOfChannels = audioBuffer.numberOfChannels;
+  const length = audioBuffer.length * numberOfChannels * 2 + 44;
+  const outBuffer = new ArrayBuffer(length);
+  const view = new DataView(outBuffer);
+
+  const writeString = (offset, string) => {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  };
+
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + audioBuffer.length * numberOfChannels * 2, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numberOfChannels, true);
+  view.setUint32(24, audioBuffer.sampleRate, true);
+  view.setUint32(28, audioBuffer.sampleRate * numberOfChannels * 2, true);
+  view.setUint16(32, numberOfChannels * 2, true);
+  view.setUint16(34, 16, true);
+  writeString(36, 'data');
+  view.setUint32(40, audioBuffer.length * numberOfChannels * 2, true);
+
+  let offset = 44;
+  for (let i = 0; i < audioBuffer.length; i++) {
+    for (let channel = 0; channel < numberOfChannels; channel++) {
+      let sample = audioBuffer.getChannelData(channel)[i];
+      sample = Math.max(-1, Math.min(1, sample));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+      offset += 2;
+    }
+  }
+
+  const mimeType = targetFormat === 'wav' ? 'audio/wav' : 'audio/mp3';
+  return new Blob([outBuffer], { type: mimeType });
 }
 
 async function imagesToPdf(files, quality) {
@@ -81,10 +130,6 @@ async function docxToPdf(file) {
   });
 
   return new Blob([await pdf.save()], { type: 'application/pdf' });
-}
-
-function baseName(name) {
-  return name.replace(/\.[^/.]+$/, '');
 }
 
 export default function Home() {
@@ -129,7 +174,7 @@ export default function Home() {
   const dropzone = useDropzone({
     onDrop,
     multiple: true,
-    maxSize: 50 * 1024 * 1024,
+    maxSize: 100 * 1024 * 1024,
   });
 
   function removeFile(index) {
@@ -165,7 +210,12 @@ export default function Home() {
       const converted = [];
 
       for (const file of files) {
-        if (output === 'TXT' || activeTab === 'ocr-text') {
+        if (['MP3', 'WAV'].includes(output) || activeTab === 'media-audio' || file.type.startsWith('video/') || file.type.startsWith('audio/')) {
+          setMessage(`Extracting audio from ${file.name}…`);
+          const audioBlob = await extractAudioFromMedia(file, output.toLowerCase());
+          converted.push({ name: `${baseName(file.name)}.${output.toLowerCase() === 'wav' ? 'wav' : 'mp3'}`, blob: audioBlob });
+        }
+        else if (output === 'TXT' || activeTab === 'ocr-text') {
           setMessage(`Scanning text in ${file.name} using OCR…`);
           const res = await Tesseract.recognize(file, 'eng');
           const extractedText = res.data.text || 'No text recognized.';
@@ -233,7 +283,9 @@ export default function Home() {
               📲 Install App
             </button>
           )}
-          <button className="theme-toggle" onClick={() => setDark((value) => !value)} aria-label="Toggle theme">☼ <span>◐</span></button>
+          <button className="theme-toggle" onClick={() => setDark((value) => !value)} aria-label="Toggle theme">
+            <span>◐</span>
+          </button>
           <a className="primary-btn small-btn" href="#converter">Get Started <span>↗</span></a>
         </div>
       </header>
@@ -242,18 +294,42 @@ export default function Home() {
         <div className="hero-copy">
           <div className="eyebrow"><span>✦</span> FAST <b>•</b> SECURE <b>•</b> FREE</div>
           <h1>Universal File Converter<br /><span>Convert Anything, Effortlessly.</span></h1>
-          <p>Transform documents, images and spreadsheets in a beautiful, simple workspace. Your files stay in your browser while you work (Developed by Arslan fayyaz).</p>
+          <p>Transform documents, images, audio, video and spreadsheets in a beautiful, simple workspace. Your files stay in your browser while you work (Developed by Arslan fayyaz).</p>
           <div className="hero-benefits">
-            <div><span>▣</span><p><b>100+ Formats</b><small>Wide format support</small></p></div>
-            <div><span>ϟ</span><p><b>Fast Conversion</b><small>In seconds</small></p></div>
-            <div><span>♢</span><p><b>Secure & Private</b><small>Browser-first processing</small></p></div>
-            <div><span>☁</span><p><b>No Installation</b><small>Works on any device</small></p></div>
+            <div>
+              <span>▣</span>
+              <div>
+                <b>100+ Formats</b>
+                <small>Wide format support</small>
+              </div>
+            </div>
+            <div>
+              <span>ϟ</span>
+              <div>
+                <b>Fast Conversions</b>
+                <small>In seconds</small>
+              </div>
+            </div>
+            <div>
+              <span>♢</span>
+              <div>
+                <b>Secure & Private</b>
+                <small>Browser-first processing</small>
+              </div>
+            </div>
+            <div>
+              <span>☁</span>
+              <div>
+                <b>No Installation</b>
+                <small>Works on any device</small>
+              </div>
+            </div>
           </div>
         </div>
         <div className="hero-art" aria-hidden="true">
           <div className="orbit orbit-one" /><div className="orbit orbit-two" />
           <div className="floating-file pdf-file">PDF</div>
-          <div className="floating-file jpg-file">JPG</div>
+          <div className="floating-file jpg-file">MP3</div>
           <div className="floating-file doc-file">DOCX</div>
           <div className="floating-file xls-file">XLSX</div>
           <div className="folder-art"><span>☁</span></div>
@@ -264,7 +340,12 @@ export default function Home() {
       <section id="converter" className="converter-card container">
         <div className="tool-tabs" role="tablist" aria-label="Conversion types">
           {tabs.map((tab) => (
-            <button key={tab.id} className={activeTab === tab.id ? 'tool-tab selected' : 'tool-tab'} onClick={() => { setActiveTab(tab.id); if(tab.id === 'ocr-text') setOutput('TXT'); setMessage(`${tab.label} selected.`); }} role="tab" aria-selected={activeTab === tab.id}>
+            <button key={tab.id} className={activeTab === tab.id ? 'tool-tab selected' : 'tool-tab'} onClick={() => { 
+              setActiveTab(tab.id); 
+              if(tab.id === 'ocr-text') setOutput('TXT'); 
+              if(tab.id === 'media-audio') setOutput('MP3');
+              setMessage(`${tab.label} selected.`); 
+            }} role="tab" aria-selected={activeTab === tab.id}>
               <span>{tab.icon}</span>{tab.label}
             </button>
           ))}
@@ -279,9 +360,9 @@ export default function Home() {
               <h2>{dropzone.isDragActive ? 'Drop your files here' : 'Drag & drop your files here'}</h2>
               <p>or</p>
               <button className="primary-btn" type="button">▣ &nbsp; Choose Files</button>
-              <small>Supports JPG, PNG, GIF, WEBP, PDF, DOCX, CSV, XLSX <b>|</b> Max size: 50MB</small>
+              <small>Supports JPG, PNG, WEBP, PDF, DOCX, CSV, XLSX, MP4, MP3, WAV <b>|</b> Max size: 100MB</small>
             </div>
-            {showAdvanced && <div className="advanced-panel"><b>Advanced tools</b><span>Batch ordering, OCR and video conversion are planned modules in this MVP.</span></div>}
+            {showAdvanced && <div className="advanced-panel"><b>Advanced tools</b><span>Batch ordering, OCR and Media conversion modules enabled.</span></div>}
           </div>
 
           <aside className="settings-panel">
@@ -304,23 +385,81 @@ export default function Home() {
       </section>
 
       <section className="results-section container">
-        <div className="section-heading"><div><span className="section-kicker">WORKSPACE</span><h2>Selected Files <em>{files.length}</em></h2></div><button className="ghost-btn" onClick={clearWorkspace}>Clear all ↗</button></div>
+        <div className="section-heading">
+          <div><span className="section-kicker">WORKSPACE</span><h2>Selected Files <em>{files.length}</em></h2></div>
+          <button className="ghost-btn" onClick={clearWorkspace}>Clear all ↗</button>
+        </div>
         <div className="file-list">
-          {files.length === 0 ? <div className="empty-state"><span>＋</span><p>No files selected yet. Add files above to see them here.</p></div> : files.map((file, index) => <div className="file-row" key={`${file.name}-${index}`}><span className="file-icon">▤</span><div className="file-details"><b>{file.name}</b><small>{file.type || 'Unknown format'} · {readableSize(file.size)}</small></div><span className="file-status">Ready</span><button className="remove-btn" onClick={() => removeFile(index)} aria-label={`Remove ${file.name}`}>×</button></div>)}
+          {files.length === 0 ? (
+            <div className="empty-state"><span>＋</span><p>No files selected yet. Add files above to see them here.</p></div>
+          ) : (
+            files.map((file, index) => (
+              <div className="file-row" key={`${file.name}-${index}`}>
+                <span className="file-icon">▤</span>
+                <div className="file-details">
+                  <b>{file.name}</b>
+                  <small>{file.type || 'Unknown format'} · {readableSize(file.size)}</small>
+                </div>
+                <span className="file-status">Ready</span>
+                <button className="remove-btn" onClick={() => removeFile(index)} aria-label={`Remove ${file.name}`}>×</button>
+              </div>
+            ))
+          )}
         </div>
+
         <div className="section-heading downloads-heading">
-          <div><span className="section-kicker">OUTPUT</span>={{/* Downloads */}}<h2>Downloads <em>{results.length}</em></h2></div>
-          {results.length > 1 && <button className="primary-btn small-btn" onClick={downloadAllZip}>Download All as ZIP 📦</button>}
+          <div><span className="section-kicker">OUTPUT</span><h2>Downloads <em>{results.length}</em></h2></div>
+          {results.length > 1 && (
+            <button className="primary-btn small-btn" onClick={downloadAllZip}>
+              Download All as ZIP 📦
+            </button>
+          )}
         </div>
+
         <div className="download-list">
-          {results.length === 0 ? <div className="empty-state"><span>↓</span><p>Converted files will appear here, ready for download.</p></div> : results.map((result, index) => <div className="file-row" key={`${result.name}-${index}`}><span className="file-icon success">✓</span><div className="file-details"><b>{result.name}</b><small>Conversion complete</small></div><button className="primary-btn download-btn" onClick={() => downloadBlob(result.blob, result.name)}>Download ↓</button></div>)}
+          {results.length === 0 ? (
+            <div className="empty-state"><span>↓</span><p>Converted files will appear here, ready for download.</p></div>
+          ) : (
+            results.map((result, index) => (
+              <div className="file-row" key={`${result.name}-${index}`}>
+                <span className="file-icon success">✓</span>
+                <div className="file-details">
+                  <b>{result.name}</b>
+                  <small>Conversion complete</small>
+                </div>
+                <button className="primary-btn download-btn" onClick={() => downloadBlob(result.blob, result.name)}>Download ↓</button>
+              </div>
+            ))
+          )}
         </div>
-        <div className="workspace-footer"><span className="status-dot" />{message}<span className="workspace-meta">{files.length} files · {readableSize(totalSize)}</span></div>
+
+        <div className="workspace-footer">
+          <span className="status-dot" />
+          {message}
+          <span className="workspace-meta">{files.length} files · {readableSize(totalSize)}</span>
+        </div>
       </section>
 
-      <section id="about" className="about-strip container"><div><span className="section-kicker">BUILT FOR EVERYONE</span><h2>Powerful tools. Simple experience.</h2></div><p>FileForge is designed as a privacy-first conversion workspace with a modern interface, clear feedback and responsive controls.</p></section>
+      <section id="about" className="about-strip container">
+        <div>
+          <span className="section-kicker">BUILT FOR EVERYONE</span>
+          <h2>Powerful tools. Simple experience.</h2>
+        </div>
+        <p>FileForge is designed as a privacy-first conversion workspace with a modern interface, clear feedback and responsive controls.</p>
+      </section>
 
-      <footer id="contact" className="footer container"><a className="brand" href="#home"><span className="brand-mark">⬡</span><span>File<span>Forge</span></span></a><p>© 2026 FileForge. All rights reserved. Developed by Arslan fayyaz</p><div><a href="#about">Privacy</a><a href="#about">Terms</a><a href="#contact">Contact</a></div></footer>
+      <footer id="contact" className="footer container">
+        <a className="brand" href="#home">
+          <span className="brand-mark">⬡</span>
+          <span>File<span>Forge</span></span>
+        </a>
+        <p>© 2026 FileForge. All rights reserved. Developed by Arslan fayyaz</p>
+        <div>
+          <a href="#about">Privacy</a>
+          <a href="#about">Terms</a>
+          <a href="#contact">Contact</a>
+        </div>
+      </footer>
     </main>
   );
 }
