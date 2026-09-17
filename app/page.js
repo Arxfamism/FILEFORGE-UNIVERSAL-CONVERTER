@@ -6,6 +6,7 @@ import { PDFDocument, rgb } from 'pdf-lib';
 import * as XLSX from 'xlsx';
 import mammoth from 'mammoth';
 import JSZip from 'jszip';
+import Tesseract from 'tesseract.js';
 
 const tabs = [
   { id: 'image-pdf', label: 'Image to PDF', icon: '▣' },
@@ -13,10 +14,10 @@ const tabs = [
   { id: 'pdf-image', label: 'PDF to Image', icon: '▤' },
   { id: 'document-pdf', label: 'Document to PDF', icon: '▥' },
   { id: 'csv-xlsx', label: 'CSV to XLSX', icon: '▦' },
-  { id: 'video-gif', label: 'Video to GIF', icon: '◉' },
+  { id: 'ocr-text', label: 'OCR (Image to Text)', icon: '🔍' },
 ];
 
-const formats = ['PDF', 'PNG', 'JPG', 'WEBP', 'CSV', 'XLSX'];
+const formats = ['PDF', 'PNG', 'JPG', 'WEBP', 'CSV', 'XLSX', 'TXT'];
 
 function downloadBlob(blob, name) {
   const url = URL.createObjectURL(blob);
@@ -56,7 +57,6 @@ async function imagesToPdf(files, quality) {
   return new Blob([await pdf.save()], { type: 'application/pdf' });
 }
 
-// DOCX to PDF Conversion
 async function docxToPdf(file) {
   const arrayBuffer = await file.arrayBuffer();
   const result = await mammoth.extractRawText({ arrayBuffer });
@@ -145,21 +145,23 @@ export default function Home() {
       const converted = [];
 
       for (const file of files) {
-        // 1. DOCX to PDF
-        if (output === 'PDF' && file.name.endsWith('.docx')) {
+        if (output === 'TXT' || activeTab === 'ocr-text') {
+          setMessage(`Scanning text in ${file.name} using OCR…`);
+          const res = await Tesseract.recognize(file, 'eng');
+          const extractedText = res.data.text || 'No text recognized.';
+          converted.push({ name: `${baseName(file.name)}_extracted.txt`, blob: new Blob([extractedText], { type: 'text/plain' }) });
+        }
+        else if (output === 'PDF' && file.name.endsWith('.docx')) {
           const pdfBlob = await docxToPdf(file);
           converted.push({ name: `${baseName(file.name)}.pdf`, blob: pdfBlob });
         } 
-        // 2. Images to PDF
         else if (output === 'PDF' && file.type.startsWith('image/')) {
           converted.push({ name: `${baseName(file.name)}.pdf`, blob: await imagesToPdf([file], quality) });
         } 
-        // 3. Image Formats (PNG, JPG, WEBP)
         else if (['PNG', 'JPG', 'WEBP'].includes(output) && file.type.startsWith('image/')) {
           const mime = output === 'PNG' ? 'image/png' : output === 'JPG' ? 'image/jpeg' : 'image/webp';
           converted.push({ name: `${baseName(file.name)}.${output.toLowerCase()}`, blob: await convertImage(file, mime, quality) });
         } 
-        // 4. Spreadsheets (CSV / XLSX)
         else if ((output === 'CSV' || output === 'XLSX') && (file.name.endsWith('.csv') || file.name.endsWith('.xlsx'))) {
           const data = await file.arrayBuffer();
           const workbook = XLSX.read(data, { type: 'array' });
@@ -170,7 +172,6 @@ export default function Home() {
             converted.push({ name: `${baseName(file.name)}.xlsx`, blob: new Blob([XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }) });
           }
         } 
-        // Fallback Document Preview to PDF
         else {
           const text = await file.text();
           const pdf = await PDFDocument.create();
@@ -182,7 +183,6 @@ export default function Home() {
 
       setResults(converted);
       setMessage(converted.length ? `${converted.length} file${converted.length > 1 ? 's' : ''} ready to download.` : 'No compatible files found for this output format.');
-      localStorage.setItem('fileforge-last-conversion', new Date().toISOString());
     } catch (error) {
       setMessage(`Conversion failed: ${error.message}`);
     } finally {
@@ -239,7 +239,7 @@ export default function Home() {
       <section id="converter" className="converter-card container">
         <div className="tool-tabs" role="tablist" aria-label="Conversion types">
           {tabs.map((tab) => (
-            <button key={tab.id} className={activeTab === tab.id ? 'tool-tab selected' : 'tool-tab'} onClick={() => { setActiveTab(tab.id); setMessage(`${tab.label} selected.`); }} role="tab" aria-selected={activeTab === tab.id}>
+            <button key={tab.id} className={activeTab === tab.id ? 'tool-tab selected' : 'tool-tab'} onClick={() => { setActiveTab(tab.id); if(tab.id === 'ocr-text') setOutput('TXT'); setMessage(`${tab.label} selected.`); }} role="tab" aria-selected={activeTab === tab.id}>
               <span>{tab.icon}</span>{tab.label}
             </button>
           ))}
@@ -265,7 +265,7 @@ export default function Home() {
             <input id="quality" className="quality-range" type="range" min="10" max="100" value={quality} onChange={(event) => setQuality(Number(event.target.value))} />
             <div className="range-labels"><span>Lower size</span><span>Better quality</span></div>
             <button className="advanced-toggle" onClick={() => setShowAdvanced((value) => !value)}>⚙ Advanced Options <span>⌄</span></button>
-            <button className="convert-btn" onClick={convertFiles} disabled={busy}>{busy ? 'Converting…' : '✦ &nbsp; Convert Files'} <span>›</span></button>
+            <button className="convert-btn" onClick={convertFiles} disabled={busy}>{busy ? 'Processing…' : '✦ &nbsp; Convert Files'} <span>›</span></button>
             <p className="privacy-note">♧ Your files are processed locally whenever supported.</p>
           </aside>
         </div>
@@ -299,4 +299,3 @@ export default function Home() {
     </main>
   );
 }
-
