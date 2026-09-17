@@ -169,7 +169,7 @@ export default function Home() {
         <div className="hero-copy">
           <div className="eyebrow"><span>✦</span> FAST <b>•</b> SECURE <b>•</b> FREE</div>
           <h1>Universal File Converter<br /><span>Convert Anything, Effortlessly.</span></h1>
-          <p>Transform documents, images and spreadsheets in a beautiful, simple workspace. Your files stay in your browser while you work.</p>
+          <p>Transform documents, images and spreadsheets in a beautiful, simple workspace. Your files stay in your browser while you work (developed by Arslan fayyaz).</p>
           <div className="hero-benefits">
             <div><span>▣</span><p><b>100+ Formats</b><small>Wide format support</small></p></div>
             <div><span>ϟ</span><p><b>Fast Conversion</b><small>In seconds</small></p></div>
